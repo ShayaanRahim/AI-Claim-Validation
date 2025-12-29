@@ -1,2 +1,12 @@
-# AI Assisted Insurance Eligibility Claim Validation Engine Healthcare Safe
-An AI-assisted healthcare claim validation backend that combines deterministic rules, structured LLM reasoning, and human-in-the-loop review to produce auditable, low-hallucination billing decisions for regulated workflows.
+
+## Core Feature Set ##
+
+This project is a AI assisted claim-validation backend designed for regulated healthcare work flows
+
+# Structured Data Handling
+
+## Deterministic + AI validation
+
+### Human in the loop design
+
+#### Auditability
