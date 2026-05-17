@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "description": "Claim with missing policy_id and empty billing codes. Should hard-fail deterministic.",
+    "expected_deterministic": "FAIL",
+    "expected_issues": ["MISSING_POLICY_ID", "MISSING_BILLING_CODES"]
+  },
+  "patient": {
+    "id": "PAT-SYN-00202",
+    "date_of_birth": "1975-11-22"
+  },
+  "coverage": {
+    "policy_id": "",
+    "start_date": "2025-01-01",
+    "end_date": "2025-12-31"
+  },
+  "care_event": {
+    "service_date": "2025-04-18",
+    "location": "Springfield Community Clinic"
+  },
+  "billing": {
+    "codes": []
+  }
+}

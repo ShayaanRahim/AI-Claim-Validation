@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "description": "Claim with whitespace-only billing code and service date before patient birth. Multiple deterministic failures.",
+    "expected_deterministic": "FAIL",
+    "expected_issues": ["INVALID_BILLING_CODE", "SERVICE_BEFORE_BIRTH"]
+  },
+  "patient": {
+    "id": "PAT-SYN-00505",
+    "date_of_birth": "2020-01-01"
+  },
+  "coverage": {
+    "policy_id": "POL-SYNTH-77234",
+    "start_date": "2019-01-01",
+    "end_date": "2026-12-31"
+  },
+  "care_event": {
+    "service_date": "2019-06-15",
+    "location": "Pediatric Specialty Center"
+  },
+  "billing": {
+    "codes": ["99213", "   "]
+  }
+}

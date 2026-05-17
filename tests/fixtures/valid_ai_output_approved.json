@@ -1,0 +1,7 @@
+{
+  "status": "approved",
+  "issues": [],
+  "confidence": 0.95,
+  "needs_human_review": false,
+  "rationale": "All data present and consistent. Coverage active, billing codes valid."
+}

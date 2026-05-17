@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "description": "Clean, fully valid claim. All fields present, dates consistent, coverage active.",
+    "expected_deterministic": "PASS",
+    "expected_ai_disposition": "approved"
+  },
+  "patient": {
+    "id": "PAT-SYN-00101",
+    "date_of_birth": "1988-03-15"
+  },
+  "coverage": {
+    "policy_id": "POL-SYNTH-44821",
+    "start_date": "2025-01-01",
+    "end_date": "2025-12-31"
+  },
+  "care_event": {
+    "service_date": "2025-06-10",
+    "location": "Mercy General Hospital"
+  },
+  "billing": {
+    "codes": ["99213", "87070"]
+  }
+}

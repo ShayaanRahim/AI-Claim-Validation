@@ -10,6 +10,9 @@ from app.db.models import Claim, Validation, ValidationSource
 from app.models.ai_validation_models import AIValidationResult
 from app.services.ai_validator import AIValidationService, compute_input_hash
 from app.services.validation.guardrails import apply_guardrails, validate_against_deterministic
+from app.services.hallucination_detector import (
+    check_for_hallucinations, apply_hallucination_escalation,
+)
 
 
 router = APIRouter(prefix="/claims", tags=["ai-validation"])
@@ -89,12 +92,13 @@ def validate_claim_ai(
         )
         
         # Step 5: Apply guardrails
-        # First, check against deterministic result
         ai_result = validate_against_deterministic(ai_result, deterministic_result)
-        
-        # Then apply standard guardrails
         ai_result = apply_guardrails(ai_result)
-        
+
+        # Step 5b: Hallucination detection
+        hallucination_check = check_for_hallucinations(ai_result, claim.raw_claim_json)
+        ai_result = apply_hallucination_escalation(ai_result, hallucination_check)
+
         # Step 6: Compute input hash for deduplication
         input_hash = compute_input_hash(claim.raw_claim_json, deterministic_result)
         
@@ -119,10 +123,14 @@ def validate_claim_ai(
             "claim_id": str(claim_id),
             "validation_id": str(validation.id),
             "validation_source": "llm",
+            "model_name": ai_service.get_model_name(),
+            "prompt_version": ai_service.get_prompt_version(),
             "status": ai_result.status,
             "confidence": ai_result.confidence,
             "needs_human_review": ai_result.needs_human_review,
-            "num_issues": len(ai_result.issues)
+            "num_issues": len(ai_result.issues),
+            "hallucination_risk": hallucination_check.hallucination_risk_detected,
+            "hallucination_flags": hallucination_check.flags,
         }))
         
         return ai_result

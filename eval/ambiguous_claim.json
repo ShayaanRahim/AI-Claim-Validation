@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "description": "Technically valid but borderline: service date is the exact last day of coverage. Deterministic passes, but AI should flag for review.",
+    "expected_deterministic": "PASS",
+    "expected_ai_disposition": "needs_review"
+  },
+  "patient": {
+    "id": "PAT-SYN-00404",
+    "date_of_birth": "1992-09-30"
+  },
+  "coverage": {
+    "policy_id": "POL-SYNTH-10055",
+    "start_date": "2025-01-01",
+    "end_date": "2025-06-30"
+  },
+  "care_event": {
+    "service_date": "2025-06-30",
+    "location": "Riverside Health Partners"
+  },
+  "billing": {
+    "codes": ["99215", "93000", "36415"]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "status": "maybe",
+  "issues": [
+    {
+      "type": "fraud_detected",
+      "field": "patient.id",
+      "severity": "critical",
+      "explanation": "Hallucinated enum values"
+    }
+  ],
+  "confidence": 0.5,
+  "needs_human_review": true,
+  "rationale": "Invented statuses"
+}
