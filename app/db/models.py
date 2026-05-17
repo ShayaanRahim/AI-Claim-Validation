@@ -61,6 +61,7 @@ class Validation(SQLModel, table=True):
     model_name: Optional[str] = Field(default=None)
     prompt_version: Optional[str] = Field(default=None)
     input_hash: Optional[str] = Field(default=None, index=True)
+    output_hash: Optional[str] = Field(default=None, index=True)
     confidence_score: Optional[float] = Field(default=None)
     needs_human_review: bool = Field(default=False, nullable=False)
 

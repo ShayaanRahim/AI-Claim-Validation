@@ -17,14 +17,16 @@ import json
 import logging
 from typing import Dict, Any, Optional
 from openai import OpenAI
-import hashlib
 
 from app.models.ai_validation_models import (
-    AIValidationResult, 
-    AIValidationRequest,
-    SAFE_FALLBACK_RESPONSE
+    AIValidationResult,
+    SAFE_FALLBACK_RESPONSE,
 )
 from app.services.validation.prompt import build_validation_prompt, get_prompt_version
+from app.utils.hashing import hash_ai_validation_input
+
+# Re-export for backward compatibility
+compute_input_hash = hash_ai_validation_input
 
 
 # Setup logging
@@ -172,26 +174,3 @@ class AIValidationService:
     def get_prompt_version(self) -> str:
         """Return the prompt version for audit tracking"""
         return get_prompt_version()
-
-
-def compute_input_hash(claim_data: Dict[str, Any], deterministic_result: Dict[str, Any]) -> str:
-    """
-    Compute a hash of the input for deduplication and auditing.
-    
-    This allows us to detect if the same claim+validation is run multiple times.
-    
-    Args:
-        claim_data: The claim data
-        deterministic_result: The deterministic validation result
-        
-    Returns:
-        SHA256 hash of the inputs
-    """
-    # Combine inputs into a stable string
-    combined = json.dumps({
-        "claim": claim_data,
-        "deterministic": deterministic_result
-    }, sort_keys=True)
-    
-    # Hash it
-    return hashlib.sha256(combined.encode()).hexdigest()

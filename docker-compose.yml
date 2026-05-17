@@ -1,17 +1,35 @@
-
-
 services:
   postgres:
     image: postgres:15
-    container_name: raya_postgres
+    container_name: claim_validation_db
     environment:
-      POSTGRES_DB: raya_db
-      POSTGRES_USER: raya_user
-      POSTGRES_PASSWORD: raya_password
+      POSTGRES_DB: claim_validation
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d claim_validation"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: claim_validation_api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/claim_validation
+      ENVIRONMENT: development
+      AUTH_DISABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:

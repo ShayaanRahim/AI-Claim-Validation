@@ -1,315 +1,339 @@
-# AI-Assisted Claim Validation System
+# AI-Assisted Claim Validation
 
-A production-grade backend for healthcare insurance claim validation with deterministic rules, AI-powered advisory analysis, human review workflows, and anti-hallucination safeguards.
+A backend system for healthcare insurance claim validation that combines deterministic rules, structured AI analysis, and human review. Built for environments where decisions must be traceable, failures must be safe, and automation must not outrun accountability.
 
-## Project Status
-
-- **Day 3 Complete**: Deterministic validation engine
-- **Day 4 Complete**: AI validation layer
-- **Day 5 Complete**: Human review workflow
-- **Day 6 Complete**: Evaluation, reliability, and anti-hallucination layer
-
-**Tests**: 174/174 passing
-**Code Quality**: No linter errors
-**Production Ready**: Yes
+This project uses **synthetic data only**. It is not HIPAA-certified and is not intended for production use with real protected health information.
 
 ---
 
-## Core Features
+## 1. Project Overview
 
-### Deterministic Validation (Day 3)
-- **Rule-based validation** with 7 explicit rules
-- **100% confidence** — no uncertainty
-- **Instant results** — no API calls
-- **Complete audit trail** — every decision traceable
-- **Status transitions**: DRAFT -> READY_FOR_AI / NEEDS_FIXES
+### What it does
 
-### AI Validation (Day 4)
-- **Advisory analysis** powered by GPT-4o-mini
-- **Confidence scoring** (0.0-1.0)
-- **Can say "unknown"** when uncertain
-- **Safe fallback** if AI fails
-- **6 guardrails** override unsafe decisions
-- **Complete metadata** tracking
+The system accepts structured healthcare claims, validates them through a fixed pipeline, and records every step for audit:
 
-### Human Review Workflow (Day 5)
-- **Review queue** — claims awaiting human decision, oldest first
-- **Three decisions** — APPROVED, REJECTED, ESCALATED
-- **Override protection** — rationale required when contradicting AI
-- **Immutable audit trail** — every review recorded with before/after status
-- **Full claim history** — validations + reviews in chronological order
-- **Status lifecycle**: DRAFT -> READY_FOR_AI -> IN_REVIEW -> APPROVED / REJECTED
+1. **Ingest** — Claims arrive as structured JSON (patient, coverage, care event, billing).
+2. **Deterministic validation** — Hard rules check completeness, format, and logical consistency.
+3. **AI validation** — An LLM provides advisory analysis with schema-enforced output.
+4. **Safety layers** — Guardrails and hallucination checks constrain AI behavior.
+5. **Human review** — Reviewers approve, reject, or escalate claims the system flags.
 
-### Evaluation and Reliability Layer (Day 6)
-- **Golden evaluation dataset** — 5 synthetic claim fixtures in `eval/`
-- **Hallucination detection** — fabricated references, invented fields, approval-without-evidence, confidence/rationale mismatches
-- **Auto-escalation** — hallucination risk automatically forces human review
-- **Configurable thresholds** — `AI_CONFIDENCE_THRESHOLD` and `AI_AUTO_APPROVE_THRESHOLD`
-- **Regression fixtures** — 9 stored AI output fixtures for schema compatibility testing
-- **Audit logging assertions** — structured log output verified by tests
-- **Deterministic stability** — same input verified to produce same output 100x
+### Why it exists
+
+Manual claim review is slow and expensive. Fully automated adjudication is risky in regulated healthcare workflows. This architecture explores a middle path: **automate what is certain, advise where judgment helps, and require humans where risk remains**.
+
+### Healthcare workflow relevance
+
+The pipeline mirrors how many payers and TPAs structure pre-adjudication:
+
+- Eligibility and field completeness (deterministic)
+- Policy and coding interpretation (AI advisory)
+- Exception handling (human review queue)
 
 ---
 
-## Architecture
+## 2. System Architecture
 
 ```
-POST /claims
-    |
-Validate with Pydantic
-    |
-Store in PostgreSQL (status: DRAFT)
-    |
-[User triggers validation]
-    |
-1. Deterministic Validation
-    |-- 7 rules (completeness, format, logic)
-    |-- Confidence: 1.0
-    +-- Status: PASS -> READY_FOR_AI / FAIL -> NEEDS_FIXES
-    |
-2. AI Validation (optional)
-    |-- Call OpenAI with structured output
-    |-- Apply 6 guardrails
-    |-- Run hallucination detection
-    |-- Confidence: 0.0-1.0
-    +-- Status: approved/needs_review/rejected/unknown
-    |
-3. Human Review
-    |-- Review queue (GET /review/queue)
-    |-- Submit decision (APPROVED/REJECTED/ESCALATED)
-    |-- Override rationale when contradicting AI
-    +-- Immutable audit trail
-    |
-Final claim status: APPROVED / REJECTED / IN_REVIEW
+                    ┌─────────────────┐
+                    │  POST /claims   │
+                    └────────┬────────┘
+                             │
+                    ┌────────▼────────┐
+                    │ Schema validation │
+                    │   (Pydantic)      │
+                    └────────┬────────┘
+                             │
+                    ┌────────▼────────┐
+                    │   PostgreSQL    │
+                    │  status: DRAFT  │
+                    └────────┬────────┘
+                             │
+              ┌──────────────▼──────────────┐
+              │  Deterministic validation   │
+              │  7 rules, confidence = 1.0  │
+              └──────────────┬──────────────┘
+                             │
+                    PASS ────┴──── FAIL
+                     │              │
+              READY_FOR_AI    NEEDS_FIXES
+                     │
+              ┌──────▼──────┐
+              │ AI validation│
+              │ (structured) │
+              └──────┬──────┘
+                     │
+         ┌───────────┼───────────┐
+         │           │           │
+    Guardrails  Hallucination  Hashing
+         │           │           │
+         └───────────┼───────────┘
+                     │
+              ┌──────▼──────┐
+              │ Review queue │
+              │  (human)     │
+              └──────┬──────┘
+                     │
+              APPROVED / REJECTED / IN_REVIEW
 ```
 
----
+### Layers
 
-## API Endpoints
-
-### Claims
-- `POST /claims` — Create a new claim
-- `GET /claims/{claim_id}` — Retrieve claim with full history
-
-### Validation
-- `POST /claims/{claim_id}/validate/deterministic` — Run rule-based validation
-- `POST /claims/{claim_id}/validate/ai` — Run AI-powered analysis (requires deterministic first)
-
-### Human Review
-- `GET /review/queue` — List claims awaiting human review (paginated)
-- `POST /claims/{claim_id}/review` — Submit a human review decision
-- `GET /claims/{claim_id}/history` — Full audit trail (validations + reviews)
-
-### Example Flow
-
-```bash
-# 1. Create claim
-curl -X POST http://localhost:8000/claims -H "Content-Type: application/json" -d '{...}'
-
-# 2. Run deterministic validation
-curl -X POST http://localhost:8000/claims/{id}/validate/deterministic
-
-# 3. Run AI validation (optional, advisory only)
-curl -X POST http://localhost:8000/claims/{id}/validate/ai
-
-# 4. View review queue
-curl http://localhost:8000/review/queue
-
-# 5. Submit human review
-curl -X POST http://localhost:8000/claims/{id}/review \
-  -H "Content-Type: application/json" \
-  -d '{"reviewer_id": "rev-1", "decision": "APPROVED", "notes": "Verified."}'
-
-# 6. View complete audit history
-curl http://localhost:8000/claims/{id}/history
-```
+| Layer | Responsibility | Authority |
+|-------|----------------|-----------|
+| Deterministic | Field completeness, dates, coverage window | Hard fail — cannot be overridden by AI |
+| AI | Discrepancy detection, coverage risk, rationale | Advisory only |
+| Guardrails | Confidence thresholds, status overrides | Deterministic post-processing |
+| Hallucination detector | Fabricated references, invented fields | Escalates to human review |
+| Human review | Final approve/reject/escalate | Binding decision |
 
 ---
 
-## Guardrails (AI Safety)
+## 3. Guardrails and Safety Design
 
-7 deterministic rules that override AI:
+### Confidence thresholds
 
-1. Low confidence (< 0.75) -> force human review
-2. Status "unknown" -> force human review
-3. Status "rejected" -> force human review
-4. Status "approved" + low confidence -> change to "needs_review"
-5. High severity issues -> force human review
-6. Deterministic FAIL + AI "approved" -> override to "needs_review"
-7. Approved but below auto-approve threshold (0.95) -> force human review
+Configured via environment variables:
 
-**These cannot be bypassed by AI.**
+| Setting | Default | Behavior |
+|---------|---------|----------|
+| `AI_CONFIDENCE_THRESHOLD` | 0.75 | Below this → force human review |
+| `AI_AUTO_APPROVE_THRESHOLD` | 0.95 | Approved below this → still requires human sign-off |
 
----
+### Hallucination detection
 
-## Hallucination Safeguards (Day 6)
+Four deterministic checks run after AI validation:
 
-4 deterministic checks that flag AI hallucination risk:
+1. **Unsupported references** — Citations to regulations, NCDs, or statutes not present in input
+2. **Invented fields** — Issues referencing fields outside the claim schema
+3. **Approval without evidence** — High-confidence approval when required data is empty
+4. **Confidence/rationale mismatch** — High confidence paired with hedging language
 
-| Check | Description |
-|---|---|
-| Unsupported references | Flags citations to fabricated regulations, NCDs, statutes |
-| Invented fields | Flags issues referencing fields not in the claim schema |
-| Approval without evidence | Flags high-confidence approval when required data is missing |
-| Confidence/rationale mismatch | Flags high confidence paired with hedging language |
+When triggered: status downgraded to `needs_review`, human review forced, flags logged.
 
-When hallucination risk is detected:
-- `needs_human_review` is forced to `true`
-- Status "approved" is downgraded to "needs_review"
-- Rationale is prefixed with `[HALLUCINATION GUARDRAIL]`
-- Flags are logged for audit
+### Deterministic overrides
 
----
+AI cannot approve a claim that failed deterministic validation. This is enforced in `validate_against_deterministic` and cannot be bypassed.
 
-## Test Coverage
+### Audit logging
 
-| Suite | Count | Description |
-|---|---|---|
-| Deterministic rules (Day 3) | 9 | All validation rules |
-| API endpoints (Day 3) | 7 | Claims CRUD, validation |
-| AI guardrails (Day 4) | 10 | Safety rules |
-| AI models (Day 4) | 10 | Schema validation |
-| AI prompt (Day 4) | 10 | Prompt structure |
-| Pydantic schemas (Day 3) | 1 | Schema test |
-| Review models (Day 5) | 9 | Review request/response schemas |
-| Review service (Day 5) | 20 | Queue, submit, history, edge cases |
-| Review API (Day 5) | 13 | HTTP endpoints, error codes |
-| Validation service (Day 6) | 16 | Golden-set, stability, edge cases |
-| AI schema validation (Day 6) | 19 | Strict enforcement, regression fixtures |
-| Hallucination safeguards (Day 6) | 20 | Detection + escalation |
-| Confidence escalation (Day 6) | 19 | Thresholds, boundaries, overrides |
-| Audit logging (Day 6) | 11 | Structured log assertions |
-| **Total** | **174** | **100% passing** |
+Every significant event emits structured JSON logs via `app.audit` logger:
+
+- `claim_id`, `validation_type`, `model_name`, `prompt_version`
+- `confidence_score`, `input_hash`, `output_hash`
+- `hallucination_risk`, `hallucination_flags`
+- `request_id` (correlation), UTC `timestamp`
+
+Secrets are scrubbed before logging.
 
 ---
 
-## Configuration
+## 4. Security Considerations
 
-### Required
-```bash
-export OPENAI_API_KEY="your-api-key"   # For AI validation
-```
+### Synthetic data only
 
-### Optional (environment variables)
-- `DATABASE_URL` — PostgreSQL connection string
-- `AI_CONFIDENCE_THRESHOLD` — Default `0.75`, below this forces human review
-- `AI_AUTO_APPROVE_THRESHOLD` — Default `0.95`, below this approved claims still need human sign-off
+All evaluation fixtures and examples use fabricated patient and policy identifiers. Do not load real PHI into this system.
 
----
+### Role-based access
 
-## Project Structure
+Authentication uses API keys via the `X-API-Key` header:
 
-```
-app/
-├── main.py                          # FastAPI app
-├── core/
-│   └── config.py                    # Settings (thresholds, DB URL)
-├── api/                             # API endpoints
-│   ├── claims.py                    # Claims CRUD
-│   ├── validation.py                # Deterministic validation
-│   ├── ai_validation.py             # AI validation + hallucination check
-│   └── review.py                    # Human review workflow
-├── models/                          # Pydantic schemas
-│   ├── claim_models.py
-│   ├── validation_models.py
-│   ├── ai_validation_models.py
-│   └── review_models.py
-├── services/                        # Business logic
-│   ├── ai_validator.py              # AI service
-│   ├── review_service.py            # Review queue, decisions, history
-│   ├── hallucination_detector.py    # Anti-hallucination checks
-│   └── validation/
-│       ├── rules.py                 # Deterministic rules
-│       ├── engine.py                # Rule orchestration
-│       ├── prompt.py                # LLM prompt template
-│       └── guardrails.py            # Post-processing safety
-└── db/                              # Database
-    ├── models.py                    # SQLModel tables
-    └── session.py                   # DB session
+| Role | Key env var | Capabilities |
+|------|-------------|--------------|
+| `system` | `SYSTEM_API_KEY` | Create claims, run deterministic and AI validation |
+| `reviewer` | `REVIEWER_API_KEY` | Review queue, submit decisions, view history |
 
-eval/                                # Golden evaluation dataset
-├── clean_claim.json
-├── missing_required_fields.json
-├── conflicting_coverage.json
-├── ambiguous_claim.json
-└── malformed_claim.json
+Reviewers cannot create claims or trigger validation. System actors cannot submit reviews.
 
-tests/                               # Test suite (174 tests)
-├── fixtures/                        # Regression AI output fixtures
-│   ├── valid_ai_output_*.json
-│   ├── invalid_ai_output_*.json
-│   └── hallucinated_ai_output.json
-├── test_validation.py
-├── test_validation_service.py
-├── test_ai_guardrails.py
-├── test_ai_models.py
-├── test_ai_prompt.py
-├── test_ai_schema_validation.py
-├── test_confidence_escalation.py
-├── test_hallucination_safeguards.py
-├── test_logging.py
-├── test_review_api.py
-├── test_review_models.py
-├── test_review_service.py
-└── test_api.py
+Set `AUTH_DISABLED=true` only for isolated test runs — never in production.
 
-alembic/                             # Database migrations
-```
+### Request tracing
+
+Every request receives an `X-Request-ID` (client-supplied or auto-generated). This ID appears in logs and error responses for end-to-end trace reconstruction.
+
+### Operational logging
+
+- No API keys or secrets in logs
+- Request timing logged (`method`, `path`, `status_code`, `duration_ms`)
+- Standardized error bodies include `request_id`
 
 ---
 
-## Quick Start
+## 5. Failure Modes
+
+| Scenario | System behavior |
+|----------|-----------------|
+| OpenAI unavailable / timeout | Safe fallback: `needs_review`, confidence 0.0 |
+| Malformed AI JSON | Retry (2 attempts), then fallback |
+| Invalid AI schema | Rejected by Pydantic, fallback returned |
+| Hallucination detected | Downgrade to `needs_review`, force human review |
+| Low confidence approval | Guardrail changes status to `needs_review` |
+| Deterministic FAIL + AI approved | Override to `needs_review` |
+| Missing API key (caller) | HTTP 401 with structured error |
+| Wrong role for endpoint | HTTP 403 |
+| Database unavailable | `/health/ready` returns 500 |
+
+The system **fails toward human review**, not toward silent approval.
+
+---
+
+## 6. Local Development
 
 ### Prerequisites
-- Python 3.12+
-- PostgreSQL
 
-### Installation
+- Python 3.12+
+- Docker and Docker Compose (recommended)
+- OpenAI API key (for AI validation only)
+
+### Quick start with Docker
 
 ```bash
-pip install -r requirements.txt
+cp .env.example .env
+# Edit .env: set OPENAI_API_KEY and rotate API keys
+
+docker compose up --build
+```
+
+API available at `http://localhost:8000`. Migrations run automatically on startup.
+
+### Manual setup
+
+```bash
+pip install -r requirements-app.txt
 createdb claim_validation
+cp .env.example .env
+# Configure DATABASE_URL and keys in .env
+
 alembic upgrade head
-export OPENAI_API_KEY="your-key"
 uvicorn app.main:app --reload
 ```
 
-### Run Tests
+### Run tests
 
 ```bash
+# Auth disabled by default in test environment
 pytest tests/ -v
-# Expected: 174 passed
+# Expected: 192 passed
+```
+
+### API examples
+
+```bash
+# System role
+export API_KEY="your-system-key"
+
+curl -X POST http://localhost:8000/claims \
+  -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
+  -d @eval/clean_claim.json
+
+# Reviewer role
+export REVIEW_KEY="your-reviewer-key"
+
+curl http://localhost:8000/review/queue \
+  -H "X-API-Key: $REVIEW_KEY"
+```
+
+### Health checks
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /health/live` | Process alive |
+| `GET /health/ready` | Database connectivity |
+
+---
+
+## 7. API Reference
+
+### Claims (system role)
+
+- `POST /claims` — Create claim
+- `GET /claims/{id}` — Retrieve claim (system or reviewer)
+
+### Validation (system role)
+
+- `POST /claims/{id}/validate/deterministic`
+- `POST /claims/{id}/validate/ai`
+
+### Review (reviewer role)
+
+- `GET /review/queue`
+- `POST /claims/{id}/review`
+- `GET /claims/{id}/history`
+
+---
+
+## 8. Configuration
+
+See `.env.example` for all variables:
+
+```bash
+ENVIRONMENT=development          # development | test | production
+DEBUG=false
+DATABASE_URL=postgresql://...
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+AI_CONFIDENCE_THRESHOLD=0.75
+AI_AUTO_APPROVE_THRESHOLD=0.95
+AUTH_DISABLED=false
+SYSTEM_API_KEY=...
+REVIEWER_API_KEY=...
 ```
 
 ---
 
-## Key Design Principles
+## 9. Project Structure
 
-1. **Safety Over Speed** — AI can say "unknown" rather than guess
-2. **Deterministic First** — Hard rules before AI analysis
-3. **Advisory AI** — Never auto-approves without human review (below 0.95 threshold)
-4. **Fail Gracefully** — Safe fallback if AI unavailable
-5. **Complete Audit** — Every decision is traceable
-6. **Schema Enforced** — No free-text, JSON only
-7. **Anti-Hallucination** — Fabricated references, invented fields, and unsupported approvals are caught and escalated
+```
+app/
+├── api/              # Thin route handlers
+├── core/             # Config, auth, audit logging, errors
+├── dependencies/     # Role-based authorization
+├── middleware/       # Request ID, timing
+├── models/           # Pydantic schemas
+├── services/         # Business logic
+├── utils/            # Hashing utilities
+└── db/               # SQLModel tables
+
+eval/                 # Golden evaluation dataset (5 fixtures)
+tests/
+├── fixtures/         # AI output regression fixtures
+└── test_*.py         # 192 tests
+
+alembic/              # Database migrations
+```
 
 ---
 
-## Technology Stack
+## 10. Test Coverage
 
-- **Framework**: FastAPI
-- **Database**: PostgreSQL + SQLModel
-- **Validation**: Pydantic
-- **AI**: OpenAI API (gpt-4o-mini)
-- **Migrations**: Alembic
-- **Testing**: Pytest
+| Area | Tests |
+|------|-------|
+| Deterministic validation | 25 |
+| AI guardrails, models, prompt | 30 |
+| AI schema enforcement | 19 |
+| Hallucination safeguards | 20 |
+| Confidence escalation | 19 |
+| Human review | 42 |
+| Authentication | 8 |
+| Health, tracing, config, hashing | 18 |
+| Audit logging | 7 |
+| API integration | 7 |
+| **Total** | **192** |
+
+---
+
+## 11. Future Improvements
+
+- FHIR R4 ingestion adapter for claim payloads
+- Payer-specific rule packs (configurable rule sets per plan)
+- Clearinghouse integration (X12 837/835)
+- Prior authorization workflow linkage
+- Operational analytics (reviewer throughput, AI override rates)
+- Embedding-based claim similarity for fraud patterns
+- Policy document RAG for grounded AI reasoning (reducing hallucination risk at source)
 
 ---
 
 ## License
 
-See [LICENSE](LICENSE) file.
-
----
-
-**Built with a focus on safety, auditability, reliability, and production readiness.**
+See [LICENSE](LICENSE).

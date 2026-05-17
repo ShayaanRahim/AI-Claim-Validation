@@ -1,13 +1,15 @@
 """Claims API endpoints"""
-import json
 from uuid import UUID
-from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
+from app.core.audit_log import log_audit_event
+from app.core.auth import Principal
 from app.db.session import get_session
 from app.db.models import Claim, Validation, ClaimStatus
-from app.models.claim_models import ClaimInput, ClaimResponse
+from app.dependencies.auth import require_authenticated, require_system
+from app.models.claim_models import ClaimInput
 
 router = APIRouter(prefix="/claims", tags=["claims"])
 
@@ -15,61 +17,43 @@ router = APIRouter(prefix="/claims", tags=["claims"])
 @router.post("", response_model=dict, status_code=201)
 def create_claim(
     claim_input: ClaimInput,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    _principal: Principal = Depends(require_system),
 ):
-    """
-    Create a new claim.
-    
-    - Validates request with Pydantic
-    - Stores raw claim JSON
-    - Sets status = DRAFT
-    - Returns claim_id
-    """
-    # Log event
-    print(json.dumps({
-        "event": "claim_created",
-        "timestamp": str(claim_input)
-    }))
-    
-    # Create claim
+    """Create a new claim (system role only)."""
     claim = Claim(
         raw_claim_json=claim_input.model_dump(mode="json"),
-        status=ClaimStatus.DRAFT
+        status=ClaimStatus.DRAFT,
     )
-    
     session.add(claim)
     session.commit()
     session.refresh(claim)
-    
+
+    log_audit_event(
+        "claim_created",
+        claim_id=str(claim.id),
+        status=claim.status,
+    )
     return {"claim_id": str(claim.id)}
 
 
 @router.get("/{claim_id}")
 def get_claim(
     claim_id: UUID,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    _principal: Principal = Depends(require_authenticated),
 ):
-    """
-    Get claim by ID.
-    
-    Returns:
-    - claim metadata
-    - raw claim
-    - all validations (ordered by time)
-    """
-    # Get claim
-    statement = select(Claim).where(Claim.id == claim_id)
-    claim = session.exec(statement).first()
-    
+    """Retrieve claim metadata and validation history."""
+    claim = session.exec(select(Claim).where(Claim.id == claim_id)).first()
     if not claim:
-        raise HTTPException(status_code=404, detail="Claim not found")
-    
-    # Get all validations for this claim
-    validations_statement = select(Validation).where(
-        Validation.claim_id == claim_id
-    ).order_by(Validation.created_at)
-    validations = session.exec(validations_statement).all()
-    
+        raise HTTPException(status_code=404, detail={"error": "not_found", "message": "Claim not found"})
+
+    validations = session.exec(
+        select(Validation).where(Validation.claim_id == claim_id).order_by(Validation.created_at)
+    ).all()
+
+    log_audit_event("claim_retrieved", claim_id=str(claim_id))
+
     return {
         "claim_id": str(claim.id),
         "status": claim.status,
@@ -81,8 +65,8 @@ def get_claim(
                 "validation_id": str(v.id),
                 "source": v.source,
                 "result": v.result_json,
-                "created_at": v.created_at.isoformat()
+                "created_at": v.created_at.isoformat(),
             }
             for v in validations
-        ]
+        ],
     }
