@@ -13,11 +13,20 @@ class ClaimStatus(str, Enum):
     DRAFT = "DRAFT"
     READY_FOR_AI = "READY_FOR_AI"
     NEEDS_FIXES = "NEEDS_FIXES"
+    IN_REVIEW = "IN_REVIEW"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
 
 
 class ValidationSource(str, Enum):
     deterministic = "deterministic"
     llm = "llm"
+
+
+class ReviewDecision(str, Enum):
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    ESCALATED = "ESCALATED"
 
 
 class Claim(SQLModel, table=True):
@@ -47,7 +56,7 @@ class Validation(SQLModel, table=True):
     source: str = Field(nullable=False)
 
     result_json: Dict[str, Any] = Field(sa_column=Column(JSON, nullable=False))
-    
+
     # AI-specific fields (optional, only populated for AI validations)
     model_name: Optional[str] = Field(default=None)
     prompt_version: Optional[str] = Field(default=None)
@@ -60,4 +69,24 @@ class Validation(SQLModel, table=True):
     )
 
 
+class Review(SQLModel, table=True):
+    __tablename__ = "reviews"
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True, index=True)
+
+    claim_id: UUID = Field(foreign_key="claims.id", index=True, nullable=False)
+    validation_id: Optional[UUID] = Field(default=None, foreign_key="validations.id")
+
+    reviewer_id: str = Field(nullable=False, index=True)
+    decision: str = Field(nullable=False)
+    notes: Optional[str] = Field(default=None)
+    override_rationale: Optional[str] = Field(default=None)
+
+    # Snapshot of claim state at review time for auditability
+    claim_status_before: str = Field(nullable=False)
+    claim_status_after: str = Field(nullable=False)
+
+    created_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    )
 
