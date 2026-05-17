@@ -1,0 +1,9 @@
+{
+  "status": "approved",
+  "issues": [],
+  "confidence": 0.9,
+  "needs_human_review": false,
+  "rationale": "Looks good",
+  "internal_score": 42,
+  "secret_field": "should not exist"
+}

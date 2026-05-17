@@ -1,0 +1,14 @@
+{
+  "status": "needs_review",
+  "issues": [
+    {
+      "type": "coverage_risk",
+      "field": "care_event.service_date",
+      "severity": "medium",
+      "explanation": "Service date is very close to coverage end date."
+    }
+  ],
+  "confidence": 0.62,
+  "needs_human_review": true,
+  "rationale": "Timing proximity warrants human review."
+}

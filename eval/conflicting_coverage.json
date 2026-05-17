@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "description": "Service date falls after coverage end date. Deterministic should catch SERVICE_AFTER_COVERAGE.",
+    "expected_deterministic": "FAIL",
+    "expected_issues": ["SERVICE_AFTER_COVERAGE"]
+  },
+  "patient": {
+    "id": "PAT-SYN-00303",
+    "date_of_birth": "1965-07-04"
+  },
+  "coverage": {
+    "policy_id": "POL-SYNTH-99012",
+    "start_date": "2024-01-01",
+    "end_date": "2024-12-31"
+  },
+  "care_event": {
+    "service_date": "2025-03-01",
+    "location": "Valley Medical Center"
+  },
+  "billing": {
+    "codes": ["99214"]
+  }
+}

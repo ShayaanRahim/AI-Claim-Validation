@@ -1,0 +1,14 @@
+{
+  "status": "rejected",
+  "issues": [
+    {
+      "type": "inconsistency",
+      "field": "coverage.end_date",
+      "severity": "high",
+      "explanation": "Service date falls outside coverage window."
+    }
+  ],
+  "confidence": 0.88,
+  "needs_human_review": true,
+  "rationale": "Clear coverage gap detected."
+}
